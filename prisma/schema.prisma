@@ -1,0 +1,104 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String
+  price       Int
+  oldPrice    Int?
+  rarity      String
+  category    String
+  game        String   @default("")
+  stock       Int
+  image       String
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@index([game])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  userId          String?
+  status          String      @default("new")
+  total           Int
+  robloxUsername  String
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id])
+  productId   String
+  productName String?
+  quantity    Int
+  price       Int
+
+  @@index([orderId])
+}
+
+model PromoCode {
+  id              String    @id @default(uuid())
+  code            String    @unique
+  discountPercent Int
+  maxUses         Int       @default(0)   // 0 = unlimited
+  usedCount       Int       @default(0)
+  expiresAt       DateTime?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+}
+
+model Banner {
+  id       String  @id @default(uuid())
+  position Int     @unique // 1, 2, 3
+  image    String  // base64 data-url or external URL
+  link     String? // optional click-through URL
+}
+
+model RobuxItem {
+  id        String   @id @default(uuid())
+  amount    Int      @unique // Robux amount (200, 400, 800, 1000, 2000, 5000)
+  price     Int      // Price in RUB
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  password  String   // bcrypt hash
+  name      String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
