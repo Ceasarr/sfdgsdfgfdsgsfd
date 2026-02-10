@@ -25,11 +25,18 @@ export function PaymentStep({ form }: PaymentStepProps) {
     const { executeRecaptcha, isLoaded } = useReCaptcha();
     const [captchaStatus, setCaptchaStatus] = useState<'loading' | 'verified' | 'error'>('loading');
 
-    // Automatically get reCAPTCHA token when component mounts
+    // Automatically get reCAPTCHA token when component mounts (with timeout)
     useEffect(() => {
-        if (!isLoaded) return;
-
         let cancelled = false;
+
+        // Timeout: if reCAPTCHA doesn't load in 10s, show error
+        const timeout = setTimeout(() => {
+            if (!cancelled && captchaStatus === 'loading') {
+                setCaptchaStatus('error');
+            }
+        }, 10000);
+
+        if (!isLoaded) return () => { cancelled = true; clearTimeout(timeout); };
 
         const getToken = async () => {
             try {
@@ -47,8 +54,8 @@ export function PaymentStep({ form }: PaymentStepProps) {
 
         getToken();
 
-        return () => { cancelled = true; };
-    }, [isLoaded, executeRecaptcha, form]);
+        return () => { cancelled = true; clearTimeout(timeout); };
+    }, [isLoaded, executeRecaptcha, form, captchaStatus]);
 
     // Retry handler
     const handleRetry = async () => {

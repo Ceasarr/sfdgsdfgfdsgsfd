@@ -23,11 +23,13 @@ const SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
 declare global {
     interface Window {
         grecaptcha: {
-            ready: (cb: () => void) => void;
-            execute: (
-                siteKey: string,
-                options: { action: string }
-            ) => Promise<string>;
+            enterprise: {
+                ready: (cb: () => void) => void;
+                execute: (
+                    siteKey: string,
+                    options: { action: string }
+                ) => Promise<string>;
+            };
         };
     }
 }
@@ -42,19 +44,22 @@ export function ReCaptchaProvider({ children }: { children: ReactNode }) {
         }
 
         // Don't load twice
-        if (document.querySelector('script[src*="recaptcha/api.js"]')) {
-            if (window.grecaptcha) {
-                window.grecaptcha.ready(() => setIsLoaded(true));
+        if (document.querySelector('script[src*="recaptcha/enterprise.js"]')) {
+            if (window.grecaptcha?.enterprise) {
+                window.grecaptcha.enterprise.ready(() => setIsLoaded(true));
             }
             return;
         }
 
         const script = document.createElement("script");
-        script.src = `https://www.google.com/recaptcha/api.js?render=${SITE_KEY}`;
+        script.src = `https://www.google.com/recaptcha/enterprise.js?render=${SITE_KEY}`;
         script.async = true;
         script.defer = true;
         script.onload = () => {
-            window.grecaptcha.ready(() => setIsLoaded(true));
+            window.grecaptcha.enterprise.ready(() => setIsLoaded(true));
+        };
+        script.onerror = () => {
+            console.error("Failed to load reCAPTCHA Enterprise script");
         };
         document.head.appendChild(script);
     }, []);
@@ -65,11 +70,11 @@ export function ReCaptchaProvider({ children }: { children: ReactNode }) {
                 throw new Error("reCAPTCHA site key not configured");
             }
 
-            if (!window.grecaptcha) {
-                throw new Error("reCAPTCHA not loaded yet");
+            if (!window.grecaptcha?.enterprise) {
+                throw new Error("reCAPTCHA Enterprise not loaded yet");
             }
 
-            return window.grecaptcha.execute(SITE_KEY, { action });
+            return window.grecaptcha.enterprise.execute(SITE_KEY, { action });
         },
         []
     );

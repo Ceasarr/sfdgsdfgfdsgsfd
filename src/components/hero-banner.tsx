@@ -53,7 +53,7 @@ export function HeroBanner() {
     return (
         <Wrapper
             {...wrapperProps}
-            className={`relative block overflow-hidden rounded-2xl border border-purple-500/20 aspect-[21/9] sm:aspect-[21/4] md:aspect-[21/4] bg-gray-900${hasLink ? " cursor-pointer" : ""}`}
+            className={`relative block overflow-hidden rounded-2xl border border-purple-500/20 aspect-[21/9] sm:aspect-[21/5] md:aspect-[21/3.2] bg-gray-900${hasLink ? " cursor-pointer" : ""}`}
         >
             {/* Images */}
             <AnimatePresence mode="wait">
