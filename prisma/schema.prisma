@@ -43,19 +43,26 @@ model Order {
   items           OrderItem[]
   createdAt       DateTime    @default(now())
 
+  // Tochka Bank payment fields
+  operationId     String?     // Tochka payment operation ID
+  paymentStatus   String      @default("pending") // pending | paid | failed | refunded
+  paymentUrl      String?     // URL to redirect user for payment
+
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([operationId])
 }
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  orderId     String
-  order       Order   @relation(fields: [orderId], references: [id])
-  productId   String
-  productName String?
-  quantity    Int
-  price       Int
+  id           String  @id @default(uuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id])
+  productId    String
+  productName  String?
+  productImage String?
+  quantity     Int
+  price        Int
 
   @@index([orderId])
 }

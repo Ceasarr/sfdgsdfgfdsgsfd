@@ -4,9 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+type PaymentStatus = "checking" | "paid" | "pending" | "unknown";
+
 export default function CheckoutSuccessPage() {
     const router = useRouter();
     const [orderNumber, setOrderNumber] = useState<string | null>(null);
+    const [orderId, setOrderId] = useState<string | null>(null);
+    const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("checking");
     const checkedRef = useRef(false);
 
     useEffect(() => {
@@ -14,16 +18,47 @@ export default function CheckoutSuccessPage() {
         if (checkedRef.current) return;
         checkedRef.current = true;
 
-        const stored = sessionStorage.getItem("lastOrderNumber");
-        if (!stored) {
+        const storedNumber = sessionStorage.getItem("lastOrderNumber");
+        const storedId = sessionStorage.getItem("lastOrderId");
+
+        if (!storedNumber) {
             // Нет номера заказа — значит пользователь зашёл напрямую
             router.replace("/");
             return;
         }
-        setOrderNumber(stored);
+
+        setOrderNumber(storedNumber);
+        setOrderId(storedId);
+
         // Удаляем после прочтения, чтобы нельзя было перезагрузить повторно
         sessionStorage.removeItem("lastOrderNumber");
+        sessionStorage.removeItem("lastOrderId");
+
+        // Проверяем статус оплаты
+        if (storedId) {
+            checkPaymentStatus(storedId);
+        } else {
+            setPaymentStatus("unknown");
+        }
     }, [router]);
+
+    const checkPaymentStatus = async (id: string) => {
+        try {
+            const response = await fetch(`/api/payment/status?orderId=${id}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.paymentStatus === "paid") {
+                    setPaymentStatus("paid");
+                } else {
+                    setPaymentStatus("pending");
+                }
+            } else {
+                setPaymentStatus("unknown");
+            }
+        } catch {
+            setPaymentStatus("unknown");
+        }
+    };
 
     if (!orderNumber) {
         return (
@@ -44,9 +79,16 @@ export default function CheckoutSuccessPage() {
                 </div>
 
                 {/* Title */}
-                <h1 className="text-2xl sm:text-3xl font-bold mb-2">Спасибо за покупку!</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+                    {paymentStatus === "paid" ? "Оплата прошла успешно!" : "Спасибо за заказ!"}
+                </h1>
                 <p className="text-muted-foreground mb-8">
-                    Ваш заказ успешно оформлен и ожидает обработки
+                    {paymentStatus === "paid" 
+                        ? "Ваш заказ оплачен и ожидает обработки"
+                        : paymentStatus === "pending"
+                        ? "Ожидаем подтверждение оплаты. Это может занять несколько минут."
+                        : "Ваш заказ успешно оформлен"
+                    }
                 </p>
 
                 {/* Order number card */}

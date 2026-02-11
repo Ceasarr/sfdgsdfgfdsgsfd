@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
-import { verifyRecaptcha } from '@/lib/recaptcha';
+import { createPayment } from '@/lib/tochka';
 
 // POST /api/orders - Create a new order
 export async function POST(req: NextRequest) {
@@ -15,29 +15,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { robloxUsername, items, promoCode, recaptchaToken } = body as {
+    const { robloxUsername, items, promoCode } = body as {
       robloxUsername: string;
       items: { productId: string; quantity: number; productName?: string }[];
       promoCode?: string | null;
-      recaptchaToken?: string;
     };
-
-    // ── reCAPTCHA verification ─────────────────────────────────────────
-    if (!recaptchaToken) {
-      return NextResponse.json(
-        { error: 'Проверка безопасности не пройдена' },
-        { status: 403 }
-      );
-    }
-
-    const captchaResult = await verifyRecaptcha(recaptchaToken, 'checkout');
-    if (!captchaResult.success) {
-      console.warn('reCAPTCHA failed on order:', captchaResult.error, 'score:', captchaResult.score);
-      return NextResponse.json(
-        { error: 'Проверка безопасности не пройдена. Попробуйте ещё раз.' },
-        { status: 403 }
-      );
-    }
 
     // Validate required fields
     if (!robloxUsername || !items || !Array.isArray(items) || items.length === 0) {
@@ -74,6 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Use a transaction to create order and update stock atomically
+    // Increased timeout for remote DB (Render Frankfurt)
     const order = await prisma.$transaction(async (tx) => {
       // === Validate and get prices for regular products ===
       let serverTotal = 0;
@@ -211,17 +194,57 @@ export async function POST(req: NextRequest) {
       }
 
       return newOrder;
-    });
+    }, { timeout: 30000 }); // 30s timeout for remote DB
 
     // Generate a readable order number
     const orderNumber = 'RBX' + order.id.slice(-8).toUpperCase();
 
+    // ── Create payment via Tochka Bank ────────────────────────────────────
+    const itemsDescription = order.items
+      .map((item) => item.productName || item.productId)
+      .slice(0, 3)
+      .join(', ');
+    const purpose = `Заказ ${orderNumber}: ${itemsDescription}${order.items.length > 3 ? '...' : ''}`;
+
+    const paymentResult = await createPayment({
+      orderId: order.id,
+      amount: order.total, // Amount in RUBLES (Tochka expects rubles)
+      purpose: purpose.slice(0, 140), // Max 140 chars
+    });
+
+    if (paymentResult.success && paymentResult.paymentLink) {
+      // Update order with payment info
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          operationId: paymentResult.operationId,
+          paymentUrl: paymentResult.paymentLink,
+          paymentStatus: 'pending',
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        order: {
+          ...order,
+          orderNumber,
+        },
+        paymentUrl: paymentResult.paymentLink,
+        operationId: paymentResult.operationId,
+      });
+    }
+
+    // Payment creation failed, but order is created
+    // Return order without payment URL (user can retry payment later)
+    console.error('Failed to create payment:', paymentResult.error);
+    
     return NextResponse.json({
       success: true,
       order: {
         ...order,
         orderNumber,
       },
+      paymentError: paymentResult.error || 'Ошибка создания платежа. Повторите позже.',
     });
   } catch (error) {
     console.error('Error creating order:', error);

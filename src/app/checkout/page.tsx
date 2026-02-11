@@ -49,9 +49,6 @@ const checkoutSchema = z.object({
 
     // Шаг 2: Оплата
     paymentMethod: z.enum(['card', 'sbp']),
-    captchaToken: z
-        .string()
-        .min(1, { message: 'Пожалуйста, подтвердите, что вы не робот' }),
 });
 
 export type CheckoutFormData = z.infer<typeof checkoutSchema>;
@@ -90,7 +87,6 @@ export default function CheckoutPage() {
             vk: '',
             email: '',
             paymentMethod: 'card',
-            captchaToken: '',
         },
         mode: 'onChange',
     });
@@ -113,7 +109,7 @@ export default function CheckoutPage() {
                 fieldsToValidate = ['robloxUsername', 'email'];
                 break;
             case 2:
-                fieldsToValidate = ['paymentMethod', 'captchaToken'];
+                fieldsToValidate = ['paymentMethod'];
                 break;
         }
 
@@ -167,7 +163,6 @@ export default function CheckoutPage() {
                     robloxUsername: data.robloxUsername,
                     items: orderItems,
                     promoCode: appliedPromo?.code || null,
-                    recaptchaToken: data.captchaToken,
                 }),
             });
 
@@ -180,10 +175,25 @@ export default function CheckoutPage() {
             // Помечаем что заказ оформлен (чтобы useEffect не перебил редирект)
             orderSubmittedRef.current = true;
 
-            // Сохраняем номер заказа в sessionStorage (до clearCart, чтобы ре-рендер не помешал)
+            // Сохраняем номер заказа в sessionStorage
             sessionStorage.setItem('lastOrderNumber', result.order.orderNumber);
+            sessionStorage.setItem('lastOrderId', result.order.id);
 
-            // Редирект на страницу успеха (до clearCart, чтобы навигация началась первой)
+            // Если есть URL оплаты — редирект на страницу оплаты Точка Банка
+            if (result.paymentUrl) {
+                // Очищаем корзину перед редиректом на внешний сайт
+                clearCart();
+                // Редирект на платёжную страницу Точка Банка
+                window.location.href = result.paymentUrl;
+                return;
+            }
+
+            // Если платёж не создался (ошибка API Точки), но заказ создан
+            if (result.paymentError) {
+                addToast(`Заказ создан, но оплата временно недоступна: ${result.paymentError}`, 'warning');
+            }
+
+            // Редирект на страницу успеха (если нет платёжного URL)
             router.push('/checkout/success');
 
             // Очистка корзины

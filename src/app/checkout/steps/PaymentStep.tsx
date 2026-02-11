@@ -1,20 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import {
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
-    FormLabel,
     FormMessage,
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreditCard, Smartphone, Shield } from 'lucide-react';
 import { CheckoutFormData } from '../page';
-import { useReCaptcha } from '@/components/recaptcha-provider';
 
 interface PaymentStepProps {
     form: UseFormReturn<CheckoutFormData>;
@@ -22,52 +18,6 @@ interface PaymentStepProps {
 
 export function PaymentStep({ form }: PaymentStepProps) {
     const paymentMethod = form.watch('paymentMethod');
-    const { executeRecaptcha, isLoaded } = useReCaptcha();
-    const [captchaStatus, setCaptchaStatus] = useState<'loading' | 'verified' | 'error'>('loading');
-
-    // Automatically get reCAPTCHA token when component mounts (with timeout)
-    useEffect(() => {
-        let cancelled = false;
-
-        // Timeout: if reCAPTCHA doesn't load in 10s, show error
-        const timeout = setTimeout(() => {
-            if (!cancelled && captchaStatus === 'loading') {
-                setCaptchaStatus('error');
-            }
-        }, 10000);
-
-        if (!isLoaded) return () => { cancelled = true; clearTimeout(timeout); };
-
-        const getToken = async () => {
-            try {
-                const token = await executeRecaptcha('checkout');
-                if (!cancelled) {
-                    form.setValue('captchaToken', token);
-                    setCaptchaStatus('verified');
-                }
-            } catch {
-                if (!cancelled) {
-                    setCaptchaStatus('error');
-                }
-            }
-        };
-
-        getToken();
-
-        return () => { cancelled = true; clearTimeout(timeout); };
-    }, [isLoaded, executeRecaptcha, form, captchaStatus]);
-
-    // Retry handler
-    const handleRetry = async () => {
-        setCaptchaStatus('loading');
-        try {
-            const token = await executeRecaptcha('checkout');
-            form.setValue('captchaToken', token);
-            setCaptchaStatus('verified');
-        } catch {
-            setCaptchaStatus('error');
-        }
-    };
 
     return (
         <Card>
@@ -147,65 +97,6 @@ export function PaymentStep({ form }: PaymentStepProps) {
 
                                 </RadioGroup>
                             </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                {/* reCAPTCHA v3 status */}
-                <FormField
-                    control={form.control}
-                    name="captchaToken"
-                    render={() => (
-                        <FormItem>
-                            <FormLabel>Проверка безопасности</FormLabel>
-                            <FormControl>
-                                <div className="border-2 border-gray-200 rounded-lg p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            {captchaStatus === 'loading' && (
-                                                <>
-                                                    <div className="w-5 h-5 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin" />
-                                                    <span className="text-sm text-gray-600">Проверка безопасности...</span>
-                                                </>
-                                            )}
-                                            {captchaStatus === 'verified' && (
-                                                <>
-                                                    <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
-                                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    </div>
-                                                    <span className="text-sm font-medium text-green-700">Проверка пройдена</span>
-                                                </>
-                                            )}
-                                            {captchaStatus === 'error' && (
-                                                <>
-                                                    <div className="w-6 h-6 bg-red-500 rounded flex items-center justify-center">
-                                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleRetry}
-                                                        className="text-sm text-red-600 hover:text-red-700 underline"
-                                                    >
-                                                        Ошибка проверки. Повторить?
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Shield className="w-5 h-5 text-gray-400" />
-                                            <span className="text-xs text-gray-500">reCAPTCHA</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </FormControl>
-                            <FormDescription>
-                                Защита от мошенничества с помощью Google reCAPTCHA
-                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
