@@ -190,7 +190,7 @@ export default function CheckoutPage() {
 
             // Если платёж не создался (ошибка API Точки), но заказ создан
             if (result.paymentError) {
-                addToast(`Заказ создан, но оплата временно недоступна: ${result.paymentError}`, 'warning');
+                addToast(`Заказ создан, но оплата временно недоступна: ${result.paymentError}`, 'error');
             }
 
             // Редирект на страницу успеха (если нет платёжного URL)
